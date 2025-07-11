@@ -1,0 +1,63 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import seaborn as sns
+
+# Load the dataset
+df = pd.read_csv("/content/day.csv")
+
+# Select relevant features and target
+features = ['season', 'yr', 'mnth', 'holiday', 'weekday', 'workingday', 'weathersit', 'temp', 'atemp', 'hum', 'windspeed']
+target = 'cnt'
+X = df[features].values
+y = df[target].values
+
+# Convert target variable to binary classification (high vs. low rentals)
+median_cnt = df[target].median()
+y = (y > median_cnt).astype(int)  # 1 if above median, 0 if below
+
+# Split the dataset: 80% for training, 20% for testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Define individual classifiers for the ensemble
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+ada = AdaBoostClassifier(n_estimators=100, random_state=42)
+gb = GradientBoostingClassifier(n_estimators=100, random_state=42)
+
+# Combine the classifiers into a VotingClassifier
+voting_clf = VotingClassifier(
+    estimators=[('rf', rf), ('ada', ada), ('gb', gb)],
+    voting='hard'
+)
+
+# Train the ensemble model
+voting_clf.fit(X_train, y_train)
+
+# Make predictions on the test set
+y_pred = voting_clf.predict(X_test)
+
+# Evaluate the model's performance
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Ensemble classifier accuracy: {accuracy * 100:.2f}%")
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+# Plot confusion matrix
+conf_matrix = confusion_matrix(y_test, y_pred)
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Plot feature importance from RandomForest
+rf.fit(X_train, y_train)
+feature_importances = rf.feature_importances_
+plt.figure(figsize=(10, 6))
+sns.barplot(x=feature_importances, y=features)
+plt.xlabel('Feature Importance')
+plt.ylabel('Features')
+plt.title('Feature Importance from RandomForest')
+plt.show()
